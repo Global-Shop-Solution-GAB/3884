@@ -1,0 +1,4 @@
+CREATE TABLE "ATG_3884_WO_NOTES"(
+ "Work_Order_No" CHAR(6) NOT NULL ,
+ "Suffix" CHAR(3),
+ "Comments" LONGVARCHAR);
