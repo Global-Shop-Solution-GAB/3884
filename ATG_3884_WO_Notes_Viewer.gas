@@ -1,0 +1,118 @@
+Program.Sub.ScreenSU.Start
+gui.F_Notes..create
+gui.F_Notes..caption("Comments")
+gui.F_Notes..size(7500,5715)
+gui.F_Notes..position(0,0)
+gui.F_Notes..event(unload,f_notes_unload)
+gui.F_Notes..alwaysontop(False)
+gui.F_Notes..fontname("Arial")
+gui.F_Notes..fontsize(8)
+gui.F_Notes..forecolor(0)
+gui.F_Notes..fontstyle(,,,,)
+gui.F_Notes..BackColor(-2147483633)
+gui.F_Notes..controlbox(True)
+gui.F_Notes..maxbutton(True)
+gui.F_Notes..minbutton(True)
+gui.F_Notes..mousepointer(0)
+gui.F_Notes..moveable(True)
+gui.F_Notes..sizeable(False)
+gui.F_Notes..ShowInTaskBar(True)
+gui.F_Notes..titlebar(True)
+gui.F_Notes.mltxtNotes.create(textboxm)
+gui.F_Notes.mltxtNotes.text("")
+gui.F_Notes.mltxtNotes.visible(True)
+gui.F_Notes.mltxtNotes.size(7200,5000)
+gui.F_Notes.mltxtNotes.zorder(0)
+gui.F_Notes.mltxtNotes.position(100,100)
+gui.F_Notes.mltxtNotes.enabled(True)
+gui.F_Notes.mltxtNotes.alignment(0)
+gui.F_Notes.mltxtNotes.fontname("Arial")
+gui.F_Notes.mltxtNotes.fontsize(8)
+gui.F_Notes.mltxtNotes.BackColor(-2147483643)
+
+
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Coded by: Melinda Keyes
+'Project Start Date: 6/29/2011
+'Hooks:
+'  13620 - script 1 button	
+'  13580 - work order query populate hook
+'Notes:
+'  This program allows the user to read the notes/comments from the ATG_3884_WO_NOTES table.
+'  It is launched by clicking the Script 1 button of the Shop Floor Control > View > Work Orders screen.
+'  Note this displays a read-only verson of the comments.
+
+Variable.Local.sJob.Declare(String)
+Variable.Local.sSuffix.Declare(String)
+Variable.Local.sQuery.Declare(String)
+Variable.Local.bExists.Declare(Boolean)
+
+'Change the text of the script 1 button when the screen is populated
+Function.Intrinsic.Control.If(Variable.Caller.Hook,=,13580)
+	Variable.Passed.000057.Set("Comments")
+	Function.Intrinsic.Control.End
+Function.Intrinsic.Control.EndIf
+
+'Get the work order number from the screen
+Variable.Local.sJob.Set(Variable.Passed.000001)
+
+'Format the work order number to match the database format
+Function.Intrinsic.String.LimitSplit(Variable.Local.sJob,6,Variable.Local.sJob)
+Function.Intrinsic.Control.If(Variable.Local.sJob.UBound,!=,1)
+	Variable.Local.sSuffix.Set("")
+Function.Intrinsic.Control.Else
+	Variable.Local.sSuffix.Set(Variable.Local.sJob(1))
+Function.Intrinsic.Control.EndIf
+Function.Intrinsic.String.Trim(Variable.Local.sJob(0),Variable.Local.sJob(0))
+Function.Intrinsic.String.Trim(Variable.Local.sSuffix,Variable.Local.sSuffix)
+
+'Open the connection to the database
+Function.ODBC.Connection!conX.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+'Makes sure the table exists, if not, create it
+Function.ODBC.Connection!conX.TableExists("ATG_3884_WO_NOTES",Variable.Local.bExists)
+Function.Intrinsic.Control.If(Variable.Local.bExists,=,False)
+	Function.Intrinsic.String.Concat("CREATE TABLE ",V.Ambient.DblQuote,"ATG_3884_WO_NOTES",V.Ambient.DblQuote," ( ",V.Ambient.DblQuote,"Work_Order_No",V.Ambient.DblQuote," CHAR(6) NOT NULL, ",V.Ambient.DblQuote,"Suffix",V.Ambient.DblQuote,"CHAR(3), ",V.Ambient.DblQuote,"Comments",V.Ambient.DblQuote," LONGVARCHAR);",Variable.Local.sQuery)
+	Function.ODBC.Connection!conX.Execute(Variable.Local.sQuery)
+Function.Intrinsic.Control.EndIf
+
+Function.Intrinsic.String.Concat("SELECT Comments FROM ATG_3884_WO_NOTES WHERE Work_Order_No = '",V.Local.sJob(0).PSQLFriendly,"' AND Suffix = '",V.Local.sSuffix.PSQLFriendly,"'",V.Local.sQuery)
+Function.ODBC.Connection!conX.OpenLocalRecordsetRO("rstNotes",V.Local.sQuery)
+
+'If there are comments, display them, if not exit the program
+Function.Intrinsic.Control.If(Variable.ODBC.conX!rstNotes.EOF,<>,True)
+	Gui.F_Notes.mltxtNotes.Text(Variable.ODBC.conX!rstNotes.FieldValTrim!Comments)
+	Function.ODBC.conX!rstNotes.Close
+Function.Intrinsic.Control.Else
+	Function.Intrinsic.UI.Msgbox("No comments found for this work order.")
+	Function.ODBC.conX!rstNotes.Close
+	Function.Intrinsic.Control.End
+Function.Intrinsic.Control.EndIf
+
+'Lock the comment text and show the screen
+Gui.F_Notes.mltxtNotes.Locked(True)
+Gui.F_Notes..Show
+
+Program.Sub.Main.End
+
+program.sub.f_notes_unload.start
+'Close the database connection and exit the program
+Function.ODBC.Connection!conX.Close
+Function.Intrinsic.Control.End
+
+program.sub.f_notes_unload.end
+
+Program.Sub.Comments.Start
+${$0$}$ATG_3884_WO_Notes_Viewer$}$TRT$}$5/2/2016
+${$1$}$$}$$}$1$}$13620$}$WOS061-SCRIPT-1-HOOK$}$5/2/2016 12:38:05 PM$}$(Program: WOQUERY; Screen: WOS061)
+
+${$1$}$$}$$}$0$}$13580$}$WOS061-POPULATE-HOOK$}$5/2/2016 12:37:46 PM$}$(Program: WOQUERY; Screen: WOS061)
+
+Program.Sub.Comments.End
+
