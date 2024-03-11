@@ -1,0 +1,177 @@
+Program.Sub.ScreenSU.Start
+gui.F_Notes..create
+gui.F_Notes..caption("Comments")
+gui.F_Notes..size(7500,6180)
+gui.F_Notes..position(0,0)
+gui.F_Notes..event(unload,f_notes_unload)
+gui.F_Notes..alwaysontop(False)
+gui.F_Notes..fontname("Arial")
+gui.F_Notes..fontsize(8)
+gui.F_Notes..forecolor(0)
+gui.F_Notes..fontstyle(,,,,)
+gui.F_Notes..BackColor(-2147483633)
+gui.F_Notes..controlbox(True)
+gui.F_Notes..maxbutton(True)
+gui.F_Notes..minbutton(True)
+gui.F_Notes..mousepointer(0)
+gui.F_Notes..moveable(True)
+gui.F_Notes..sizeable(False)
+gui.F_Notes..ShowInTaskBar(True)
+gui.F_Notes..titlebar(True)
+gui.F_Notes.mltxtNotes.create(textboxm)
+gui.F_Notes.mltxtNotes.text("")
+gui.F_Notes.mltxtNotes.visible(True)
+gui.F_Notes.mltxtNotes.size(7200,5000)
+gui.F_Notes.mltxtNotes.zorder(0)
+gui.F_Notes.mltxtNotes.position(100,100)
+gui.F_Notes.mltxtNotes.enabled(True)
+gui.F_Notes.mltxtNotes.alignment(0)
+gui.F_Notes.mltxtNotes.fontname("Arial")
+gui.F_Notes.mltxtNotes.fontsize(8)
+gui.F_Notes.mltxtNotes.BackColor(-2147483643)
+gui.F_Notes.cmdSave.create(button)
+gui.F_Notes.cmdSave.caption("Save")
+gui.F_Notes.cmdSave.visible(True)
+gui.F_Notes.cmdSave.size(1000,375)
+gui.F_Notes.cmdSave.zorder(0)
+gui.F_Notes.cmdSave.position(100,5200)
+gui.F_Notes.cmdSave.enabled(True)
+gui.F_Notes.cmdSave.fontname("Arial")
+gui.F_Notes.cmdSave.fontsize(8)
+gui.F_Notes.cmdSave.event(click,cmdsave_click)
+gui.F_Notes.cmdDelete.create(button)
+gui.F_Notes.cmdDelete.caption("Delete")
+gui.F_Notes.cmdDelete.visible(True)
+gui.F_Notes.cmdDelete.size(1000,375)
+gui.F_Notes.cmdDelete.zorder(0)
+gui.F_Notes.cmdDelete.position(1200,5200)
+gui.F_Notes.cmdDelete.enabled(True)
+gui.F_Notes.cmdDelete.fontname("Arial")
+gui.F_Notes.cmdDelete.fontsize(8)
+gui.F_Notes.cmdDelete.event(click,cmddelete_click)
+
+
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Coded by: Melinda Keyes
+'Project Start Date: 6/29/2011
+'Hooks:
+'  16670 - Script 1 button
+'  16630 - Work Order populate hook
+'Notes:
+'  This GAB script allows for notes and comments to be added to a work order.
+'  There is an option to add, modify, and delete comments even after a work order has been closed or purged.
+'  All comments are saved with their work order number to the ATG_WO_NOTES database.
+'  This program is lauched from the script 1 button of the Work Order header screen.
+
+Variable.Global.sJob.Declare(String)
+Variable.Global.sSuffix.Declare(String)
+Variable.Local.sQuery.Declare(String)
+Variable.Local.bExists.Declare(Boolean)
+
+'When the Work Order screen is populated, change the text on the script 1 button
+Function.Intrinsic.Control.If(Variable.Caller.Hook,=,16630)
+	Variable.Passed.000091.Set("Comments")
+	Function.Intrinsic.Control.End
+Function.Intrinsic.Control.EndIf
+
+'When the Script 1 button (now labeled "Comments") is clicked, open up the Comments screen
+Variable.Global.sJob.Set(Variable.Passed.000003.Trim)
+Variable.Global.sSuffix.Set(Variable.Passed.000004.Trim)
+
+'If there is no work order number entered, request the user enter one and exit the program
+Function.Intrinsic.Control.If(Variable.Global.sJob,=,"")
+	Function.Intrinsic.UI.Msgbox("Please enter a work order number.")
+	Function.Intrinsic.Control.End
+Function.Intrinsic.Control.Else
+	'Open a connection to the database and check if there are already comments to this work order
+	Function.ODBC.Connection!conX.OpenConnection(Variable.Ambient.PDSN,Variable.Ambient.PUser,Variable.Ambient.PPass)
+	'Check to see if the table exists, if not create it
+	Function.ODBC.Connection!conX.TableExists("ATG_3884_WO_NOTES",Variable.Local.bExists)
+	Function.Intrinsic.Control.If(Variable.Local.bExists,=,False)
+		Function.Intrinsic.String.Concat("CREATE TABLE ",V.Ambient.DblQuote,"ATG_3884_WO_NOTES",V.Ambient.DblQuote," ( ",V.Ambient.DblQuote,"Work_Order_No",V.Ambient.DblQuote," CHAR(6) NOT NULL, ",V.Ambient.DblQuote,"Suffix",V.Ambient.DblQuote,"CHAR(3), ",V.Ambient.DblQuote,"Comments",V.Ambient.DblQuote," LONGVARCHAR);",Variable.Local.sQuery)
+		Function.ODBC.Connection!conX.Execute(Variable.Local.sQuery)
+	Function.Intrinsic.Control.EndIf
+
+	Function.Intrinsic.String.Concat("SELECT * FROM ATG_3884_WO_NOTES WHERE Work_Order_No = '",Variable.Global.sJob.PSQLFriendly,"' AND Suffix = '",Variable.Global.sSuffix.PSQLFriendly,"'",Variable.Local.sQuery)
+	Function.ODBC.Connection!conX.OpenLocalRecordsetRO("rstNotes",Variable.Local.sQuery)
+	'if comments have already been entered for this work order, display them in the comments screen
+	Function.Intrinsic.Control.If(Variable.ODBC.conX!rstNotes.EOF,<>,True)
+		Gui.F_Notes.mltxtNotes.Text(Variable.ODBC.conX!rstNotes.FieldValTrim!Comments)
+	Function.Intrinsic.Control.EndIf
+	Function.ODBC.conX!rstNotes.Close
+	'show the comments screen
+	Gui.F_Notes..Show
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+program.sub.cmdsave_click.start
+'disable the screen from further input
+Gui.F_Notes..Enabled(False)
+
+Variable.Local.sNotes.Declare(String)
+Variable.Local.sQuery.Declare(String)
+
+'get the comments entered from the screen
+Variable.Local.sNotes.Set(Variable.Screen.F_Notes!mltxtNotes.Text)
+Function.Intrinsic.String.Trim(Variable.Local.sNotes,Variable.Local.sNotes)
+
+'check to see if there are already comments for this work order
+Function.Intrinsic.String.Concat("SELECT * FROM ATG_3884_WO_NOTES WHERE Work_Order_No = '",Variable.Global.sJob.PSQLFriendly,"' AND Suffix = '",Variable.Global.sSuffix.PSQLFriendly,"'",Variable.Local.sQuery)
+Function.ODBC.Connection!conX.OpenRecordsetRW("rstNotes",Variable.Local.sQuery)
+Function.Intrinsic.Control.If(Variable.ODBC.conX!rstNotes.EOF,<>,True)
+	'if there are already comments for this work order, overwrite them
+	Function.ODBC.conX!rstNotes.Set!Comments(Variable.Local.sNotes)
+Function.Intrinsic.Control.Else
+	'if there is no information for this work order, add a new record and save the comments
+	Function.ODBC.conX!rstNotes.AddNew
+	Function.ODBC.conX!rstNotes.Set!Work_Order_No(Variable.Global.sJob.PSQLFriendly)
+	Function.ODBC.conX!rstNotes.Set!Suffix(Variable.Global.sSuffix.PSQLFriendly)
+	Function.ODBC.conX!rstNotes.Set!Comments(Variable.Local.sNotes.PSQLFriendly)
+Function.Intrinsic.Control.EndIf
+
+'update and close the record set
+Function.ODBC.conX!rstNotes.Update
+Function.ODBC.conX!rstNotes.Close
+
+'prepare to exit the program
+Function.Intrinsic.Control.CallSub(F_notes_unload)
+
+program.sub.cmdsave_click.end
+
+program.sub.cmddelete_click.start
+'disable the screen from further input
+Gui.F_Notes..Enabled(False)
+
+Variable.Local.sQuery.Declare(String)
+
+'delete the comment record for this work order from the database
+Function.Intrinsic.String.Concat("DELETE FROM ATG_3884_WO_NOTES WHERE Work_Order_No = '",Variable.Global.sJob.PSQLFriendly,"' AND Suffix = '",Variable.Global.sSuffix.PSQLFriendly,"'",Variable.Local.sQuery)
+Function.ODBC.Connection!conX.Execute(Variable.Local.sQuery)
+
+'prepare to exit the program
+Function.Intrinsic.Control.CallSub(F_notes_unload)
+
+program.sub.cmddelete_click.end
+
+program.sub.f_notes_unload.start
+'Close the database connection and exit the program
+Function.ODBC.Connection!conX.Close
+Function.Intrinsic.Control.End
+
+program.sub.f_notes_unload.end
+
+Program.Sub.Comments.Start
+${$0$}$ATG_3884_WO_Notes$}$TRT$}$5/2/2016
+${$1$}$$}$$}$1$}$16670$}$Script 1 Hook$}$5/2/2016 12:35:59 PM$}$(Program: JB0010GI; Screen: JBS0010)
+
+${$1$}$$}$$}$0$}$16630$}$Populate Hook$}$5/2/2016 12:35:23 PM$}$(Program: JB0010GI; Screen: JBS0010  )
+
+Program.Sub.Comments.End
+
